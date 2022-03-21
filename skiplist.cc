@@ -16,7 +16,8 @@ SkipList::SkipList()
     tail=new Node(0,"");
     for(unsigned int i=0;i<MAX_LEVEL;++i)
         head->forwards[i]=tail->forwards[i]=tail;
-    random_engine.seed(time(0));
+    sz=0;
+    random_engine.seed(time(nullptr));
     random_int=new std::uniform_int_distribution<unsigned int>(0,MAX_LEVEL-1);
 }
 SkipList::~SkipList()
@@ -30,17 +31,32 @@ SkipList::~SkipList()
     }
     delete ncur;
 }
+unsigned int SkipList::size() const
+{
+    return sz;
+}
 void SkipList::put(uint64_t key,const std::string &s)
 {
-    Node *ntmp=new Node(key,s);
-    for(unsigned int i=0;i<MAX_LEVEL;++i)
-        ntmp->forwards[i]=tail;
     Node *ncur=head;
-    for(unsigned int i=random_level();i>=0;--i)
+    Node *back[8];
+    for(unsigned int i=MAX_LEVEL-1;i>=0;--i)
     {
         while(ncur->forwards[i]!=tail&&ncur->forwards[i]->key<key)
             ncur=ncur->forwards[i];
-        ncur->forwards[i]=ntmp;
+        back[i]=ncur;
+    }
+    if(ncur->forwards[0]!=tail&&ncur->forwards[0]->key==key)
+    {
+        ncur->forwards[0]->s=s;
+        return ;
+    }
+    Node *ntmp=new Node(key,s);
+    for(unsigned int i=0;i<MAX_LEVEL;++i)
+        ntmp->forwards[i]=tail;
+    for(unsigned int i=random_level();i>=0;--i)
+    {
+        ntmp->forwards[i]=back[i]->forwards[i];
+        back[i]->forwards[i]=ntmp;
     }
 }
 std::string SkipList::get(uint64_t key) const
@@ -82,6 +98,7 @@ void SkipList::reset()
     }
     for(unsigned int i=0;i<MAX_LEVEL;++i)
         head->forwards[i]=tail;
+    sz=0;
 }
 void SkipList::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::string>> &list) const
 {
@@ -89,17 +106,16 @@ void SkipList::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std
     for(unsigned int i=MAX_LEVEL-1;i>=0;--i)
         while(n1->forwards[i]!=tail&&n1->forwards[i]->key<key1)
             n1=n1->forwards[i];
+    if(n1->forwards[0]==tail) return ;
+    n1=n1->forwards[0];
     Node *n2=n1;
     for(unsigned int i=MAX_LEVEL-1;i>=0;--i)
-        while(n2->forwards[i]!=tail&&n2->forwards[i]->key<key2)
+        while(n2->forwards[i]!=tail&&n2->forwards[i]->key<=key2)
             n2=n2->forwards[i];
+    n2=n2->forwards[0];
     while(n1!=n2)
     {
         list.push_back(std::make_pair(n1->key,n1->s));
         n1=n1->forwards[0];
     }
-}
-void SkipList::to_sstable() const
-{
-    //TODO
 }
