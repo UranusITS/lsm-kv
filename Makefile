@@ -1,12 +1,15 @@
-
+CC = g++
 LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++14 -Wall
+LIB = kvstore.o memtable.o skiplist.o sstable.o bits.o bloomfilter.o
 
 all: correctness persistence
 
-correctness: kvstore.o memtable.o skiplist.o sstable.o bloomfilter.o correctness.o
+correctness: $(LIB) correctness.o
 
-persistence: kvstore.o memtable.o skiplist.o sstable.o bloomfilter.o persistence.o
+persistence: $(LIB) persistence.o
+
+.PHONY: clean
 
 clean:
-	-rm -f all *.o
+	-rm -f *.o *.exe
