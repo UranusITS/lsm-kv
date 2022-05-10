@@ -13,21 +13,27 @@ MemTable::~MemTable()
 {
     delete skip_list;
 }
-uint64_t MemTable::size() const
+uint64_t MemTable::get_size() const
 {
     return sz;
 }
-uint64_t MemTable::num() const
+uint64_t MemTable::get_num() const
 {
     return skip_list->size();
 }
-uint64_t MemTable::min() const
+uint64_t MemTable::get_min() const
 {
     return min_key;
 }
-uint64_t MemTable::max() const
+uint64_t MemTable::get_max() const
 {
     return max_key;
+}
+std::list<std::pair<uint64_t,std::string>> MemTable::get_list() const
+{
+    std::list<std::pair<uint64_t,std::string>>tmp;
+    skip_list->scan(min_key,max_key,tmp);
+    return tmp;
 }
 bool MemTable::put(uint64_t key,const std::string &s)
 {
@@ -44,6 +50,10 @@ std::string MemTable::get(uint64_t key)
 }
 bool MemTable::del(uint64_t key)
 {
+    std::string s=skip_list->get(key);
+    if(s=="")
+        return false;
+    sz-=13+s.length();
     return skip_list->del(key);
 }
 void MemTable::reset()

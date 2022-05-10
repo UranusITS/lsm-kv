@@ -5,10 +5,9 @@ SSInfo::SSInfo(const SSTable &sstable,const std::string &filename):
 SSInfo::SSInfo(time_t time_stamp,uint64_t min_key,uint64_t max_key,const std::string &filename):
     time_stamp(time_stamp),min_key(min_key),max_key(max_key),filename(filename) {}
 SSTable::SSTable(const MemTable &memtable):
-    time_stamp(time(nullptr)),sz(memtable.num()),min_key(memtable.min()),max_key(memtable.max()),bf(BloomFilter(list))
-{
-    memtable.scan(min_key,max_key,list);
-}
+    time_stamp(time(nullptr)),sz(memtable.get_num()),min_key(memtable.get_min()),max_key(memtable.get_max()),list(memtable.get_list()),bf(BloomFilter(list)) {}
+SSTable::SSTable(const MemTable *memtable):
+    time_stamp(time(nullptr)),sz(memtable->get_num()),min_key(memtable->get_min()),max_key(memtable->get_max()),list(memtable->get_list()),bf(BloomFilter(list)) {}
 SSTable::SSTable(const std::list<std::pair<uint64_t,std::string>> &new_list):
     time_stamp(time(nullptr)),sz(list.size()),bf(BloomFilter(list)),list(new_list)
 {
@@ -22,7 +21,7 @@ SSTable::SSTable(const std::list<std::pair<uint64_t,std::string>> &new_list):
 }
 SSTable::SSTable(const std::string &filename)
 {
-    std::ifstream in(filename);
+    std::ifstream in(filename,std::ios::binary);
     in.read((char*)&time_stamp,8);
     in.read((char*)&sz,8);
     in.read((char*)&min_key,8);
@@ -48,7 +47,7 @@ std::list<std::pair<uint64_t,std::string>> SSTable::get_list() const
 }
 void SSTable::write(const std::string &filename) const
 {
-    std::ofstream out(filename);
+    std::ofstream out(filename,std::ios::binary);
     out.write((char*)&time_stamp,8);
     out.write((char*)&sz,8);
     out.write((char*)&min_key,8);
@@ -67,9 +66,22 @@ void SSTable::write(const std::string &filename) const
         out.write((char*)'\0',1);
     }
 }
+std::string SSTable::get(uint64_t key) const
+{
+    for(auto &x:list)
+        if(x.first==key)
+            return x.second;
+    return "";
+}
 void SSTable::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::string>> &list) const
 {
     for(auto &x: this->list)
         if(x.first>=key1&&x.first<=key2)
-            list.push_back(x);
+        {
+            auto it=list.begin();
+            while(it!=list.end()&&it->first<x.first)
+                it++;
+            if(it==list.end()||it->first>x.first)
+                list.insert(it,x);
+        }
 }

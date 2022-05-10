@@ -11,10 +11,11 @@ public:
     const static uint64_t INIT_SZ;
     MemTable();
     ~MemTable();
-    uint64_t size() const;
-    uint64_t num() const;
-    uint64_t min() const;
-    uint64_t max() const;
+    uint64_t get_size() const;
+    uint64_t get_num() const;
+    uint64_t get_min() const;
+    uint64_t get_max() const;
+    std::list<std::pair<uint64_t,std::string>> get_list() const;
     bool put(uint64_t key,const std::string &s);
     std::string get(uint64_t key);
     bool del(uint64_t key);

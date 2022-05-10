@@ -12,6 +12,7 @@ public:
     BloomFilter();
     BloomFilter(const std::list<std::pair<uint64_t,std::string>> &list);
     BloomFilter(const BloomFilter &bf);
+    BloomFilter(const std::string &filename);
     ~BloomFilter();
     const BloomFilter &operator=(const BloomFilter &bf);
     operator char*() const;

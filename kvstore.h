@@ -1,12 +1,12 @@
 #pragma once
 #include"kvstore_api.h"
 #include"memtable.h"
-#include"sstable.h"
 #include"levelmanager.h"
 class KVStore:public KVStoreAPI
 {
 private:
 	MemTable *memtable;
+	LevelManager *level_manager;
 public:
 	KVStore(const std::string &dir);
 	~KVStore();

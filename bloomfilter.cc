@@ -1,5 +1,6 @@
 #include"bloomfilter.h"
 #include"MurmurHash3.h"
+#include<fstream>
 int BloomFilter::MAX_SZ=10240;
 BloomFilter::BloomFilter()
 {
@@ -14,6 +15,13 @@ BloomFilter::BloomFilter(const std::list<std::pair<uint64_t,std::string>> &list)
 BloomFilter::BloomFilter(const BloomFilter &bf)
 {
     bits=new Bits(*bf.bits);
+}
+BloomFilter::BloomFilter(const std::string &filename)
+{
+    std::ifstream in(filename,std::ios::binary);
+    char ignore_buf[32];
+    in.read((char*)ignore_buf,32);
+    in.read((char*)bits,10240);
 }
 BloomFilter::~BloomFilter()
 {
