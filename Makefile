@@ -1,7 +1,7 @@
 CC = g++
 LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++14 -Wall
-LIB = kvstore.o memtable.o skiplist.o sstable.o bits.o bloomfilter.o
+LIB = kvstore.o memtable.o skiplist.o levelmanager.o sstable.o bits.o bloomfilter.o
 
 all: correctness persistence
 

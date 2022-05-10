@@ -7,8 +7,8 @@ private:
     uint64_t sz,min_key,max_key;
     SkipList *skip_list;
 public:
-    static uint64_t MAX_SZ;
-    static uint64_t INIT_SZ;
+    const static uint64_t MAX_SZ;
+    const static uint64_t INIT_SZ;
     MemTable();
     ~MemTable();
     uint64_t size() const;

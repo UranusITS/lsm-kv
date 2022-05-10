@@ -1,7 +1,7 @@
 #include"memtable.h"
 #include<ctime>
-uint64_t MemTable::INIT_SZ=10272;
-uint64_t MemTable::MAX_SZ=2097152;
+const uint64_t MemTable::INIT_SZ=10272;
+const uint64_t MemTable::MAX_SZ=2097152;
 MemTable::MemTable()
 {
     skip_list=new SkipList;
