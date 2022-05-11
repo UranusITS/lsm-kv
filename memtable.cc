@@ -51,8 +51,7 @@ std::string MemTable::get(uint64_t key)
 bool MemTable::del(uint64_t key)
 {
     std::string s=skip_list->get(key);
-    if(s=="")
-        return false;
+    if(s=="") return false;
     sz-=13+s.length();
     return skip_list->del(key);
 }

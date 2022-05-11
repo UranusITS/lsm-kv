@@ -1,4 +1,5 @@
-#include "kvstore.h"
+#include"kvstore.h"
+#include<iostream>
 KVStore::KVStore(const std::string &dir):
 	KVStoreAPI(dir)
 {
@@ -7,7 +8,8 @@ KVStore::KVStore(const std::string &dir):
 }
 KVStore::~KVStore()
 {
-	level_manager->put_sstable(SSTable(*memtable));
+	if(memtable->get_num())
+		level_manager->put_sstable(SSTable(memtable));
 	delete memtable;
 	delete level_manager;
 }
@@ -17,9 +19,11 @@ KVStore::~KVStore()
  */
 void KVStore::put(uint64_t key,const std::string &s)
 {
+	//std::cout<<"PUT("<<key<<','<<s<<')'<<std::endl;
+	//std::cout<<"PUT("<<key<<')'<<std::endl;
 	if(!memtable->put(key,s))
 	{
-		level_manager->put_sstable(SSTable(*memtable));
+		level_manager->put_sstable(SSTable(memtable));
 		memtable->reset();
 	}
 	memtable->put(key,s);
@@ -30,9 +34,14 @@ void KVStore::put(uint64_t key,const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
+	//std::cout<<"GET("<<key<<')'<<std::endl;
     std::string s=memtable->get(key);
 	if(s!="")
+	{
+		if(s==Level::DELETE_LABEL)
+			return "";
 		return s;
+	}
 	return level_manager->get(key);
 }
 /**
@@ -41,9 +50,21 @@ std::string KVStore::get(uint64_t key)
  */
 bool KVStore::del(uint64_t key)
 {
-	if(memtable->del(key)) return true;
-	else if(level_manager->get(key)!="")
+	//std::cout<<"DEL("<<key<<')'<<std::endl;
+	std::string s=memtable->get(key);
+	if(s==Level::DELETE_LABEL)
+		return false;
+	else if(s=="")
+	{
+		s=level_manager->get(key);
+		if(s==Level::DELETE_LABEL||s=="")
+			return false;
 		put(key,Level::DELETE_LABEL);
+		return true;
+	}
+	else
+		return memtable->del(key);
+	return false;
 }
 /**
  * This resets the kvstore. All key-value pairs should be removed,
@@ -51,6 +72,7 @@ bool KVStore::del(uint64_t key)
  */
 void KVStore::reset()
 {
+	//std::cout<<"RESET"<<std::endl;
 	memtable->reset();
 	level_manager->reset();
 }
@@ -61,9 +83,12 @@ void KVStore::reset()
  */
 void KVStore::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::string>>&list)
 {
+	//std::cout<<"SCAN("<<key1<<','<<key2<<')'<<std::endl;
 	memtable->scan(key1,key2,list);
 	level_manager->scan(key1,key2,list);
 	for(auto it=list.begin();it!=list.end();it++)
+	{
 		if(it->second==Level::DELETE_LABEL)
 			list.erase(it);
+	}
 }

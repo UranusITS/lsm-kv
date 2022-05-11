@@ -1,7 +1,7 @@
 #include"bloomfilter.h"
 #include"MurmurHash3.h"
 #include<fstream>
-int BloomFilter::MAX_SZ=10240;
+const int BloomFilter::MAX_SZ=10240;
 BloomFilter::BloomFilter()
 {
     bits=new Bits(MAX_SZ);
@@ -19,9 +19,15 @@ BloomFilter::BloomFilter(const BloomFilter &bf)
 BloomFilter::BloomFilter(const std::string &filename)
 {
     std::ifstream in(filename,std::ios::binary);
-    char ignore_buf[32];
+    static char ignore_buf[32];
     in.read((char*)ignore_buf,32);
-    in.read((char*)bits,10240);
+    unsigned int sz=(MAX_SZ-1)/sizeof(uint64_t)+1;
+    uint64_t *tmp=new uint64_t[sz];
+    for(unsigned int i=0;i<sz;++i)
+        in.read((char*)&tmp[i],8);
+    bits=new Bits(tmp,sz);
+    delete[] tmp;
+    in.close();
 }
 BloomFilter::~BloomFilter()
 {
@@ -29,19 +35,23 @@ BloomFilter::~BloomFilter()
 }
 const BloomFilter &BloomFilter::operator=(const BloomFilter &bf)
 {
-    bits=bf.bits;
+    *bits=*bf.bits;
     return *this;
 }
 BloomFilter::operator char*() const
 {
     return (char*)bits;
 }
+unsigned int BloomFilter::to_raw(uint64_t **dest) const
+{
+    return bits->to_raw(dest);
+}
 void BloomFilter::insert(uint64_t elem)
 {
     unsigned int hash[4];
     MurmurHash3_x64_128(&elem,sizeof(elem),1,hash);
     for(unsigned int i=0;i<4;++i)
-        bits->set(hash[i]%MAX_SZ,1);
+        bits->set(hash[i]%MAX_SZ,true);
 }
 bool BloomFilter::find(uint64_t elem) const
 {

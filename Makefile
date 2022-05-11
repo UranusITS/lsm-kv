@@ -12,4 +12,4 @@ persistence: $(LIB) persistence.o
 .PHONY: clean
 
 clean:
-	-rm -f *.o *.exe
+	-rm -f *.o *.exe correctness persistence

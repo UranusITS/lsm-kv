@@ -1,7 +1,21 @@
 #include"levelmanager.h"
 #include"utils.h"
+#include<vector>
+#include<iostream>
 const std::string Level::DELETE_LABEL="~DELETED~";
-Level::Level(int cap,const std::string &pathname):cap(cap),filename_cnt(0),pathname(pathname) {}
+Level::Level(int cap,const std::string &pathname):
+    cap(cap),filename_cnt(0),pathname(pathname)
+{
+    std::vector<std::string>files;
+    utils::scanDir(pathname,files);
+    for(auto &file:files)
+    {
+        SSInfo ssinfo=SSInfo(pathname+"/"+file,file);
+        ssinfos.push_back(ssinfo);
+        filename_cnt=std::max(filename_cnt,uint64_t(atoll(file.c_str()+5)+1));
+    }
+    sort();
+}
 unsigned int Level::get_cap() const
 {
     return cap;
@@ -10,39 +24,49 @@ unsigned int Level::get_size() const
 {
     return ssinfos.size();
 }
+std::string Level::get_pathname() const
+{
+    return pathname;
+}
 bool Level::is_overflow() const
 {
     return ssinfos.size()>cap;
 }
 void Level::put_sstable(const SSTable &sstable)
 {
-    std::string filename=std::to_string(filename_cnt)+".sst";
+    std::string filename=std::to_string(filename_cnt++)+".sst";
     ssinfos.push_back(SSInfo(sstable,filename));
     sstable.write(pathname+"/"+filename);
+    sort();
 }
-void Level::put_list(std::list<std::pair<uint64_t,std::string>> list)
+void Level::put_list(std::list<std::pair<uint64_t,std::string>> &list)
 {
-    for(auto it=list.begin();it!=list.end();it++)
+    for(auto it=list.begin();it!=list.end();)
+    {
         if(it->second==DELETE_LABEL)
-            list.erase(it);
+            list.erase(it++);
+        else
+            it++;
+    }
     std::list<std::pair<uint64_t,std::string>>tmp;
-    uint64_t sz=0;
+    uint64_t sz=MemTable::INIT_SZ;
     for(auto it=list.begin();it!=list.end();it++)
     {
         if(sz+13+it->second.length()>MemTable::MAX_SZ)
         {
             put_sstable(SSTable(tmp));
             tmp.clear();
-            sz=0;
+            sz=MemTable::INIT_SZ;
         }
         tmp.push_back(*it);
         sz+=13+it->second.length();
     }
     if(!tmp.empty()) put_sstable(SSTable(tmp));
+    sort();
 }
 void Level::push_down(Level &next_level)
 {
-    std::list<std::pair<uint64_t,std::string>>tmp;
+    std::list<std::pair<uint64_t,std::string>>re;
     uint64_t del_min_key=UINT64_MAX,del_max_key=0;
     while(is_overflow())
     {
@@ -50,47 +74,90 @@ void Level::push_down(Level &next_level)
         for(auto it=ssinfos.begin();it!=ssinfos.end();it++)
             if(it->time_stamp<del_it->time_stamp)
                 del_it=it;
-        SSTable sstable(del_it->filename);
-        tmp.merge(sstable.get_list());
+        SSTable sstable(pathname+"/"+del_it->filename);
+        std::list<std::pair<uint64_t,std::string>>tmp=sstable.get_list();
+        auto rit=re.begin();
+        for(auto tit=tmp.begin();tit!=tmp.end();tit++)
+        {
+            while(rit!=re.end()&&tit->first>rit->first)
+                rit++;
+            if(rit!=re.end()&&tit->first==rit->first)
+                continue;
+            re.insert(rit,*tit);
+        }
         del_min_key=std::min(del_min_key,del_it->min_key);
         del_max_key=std::max(del_max_key,del_it->max_key);
         utils::rmfile((pathname+"/"+del_it->filename).c_str());
         ssinfos.erase(del_it);
     }
-    for(auto it=next_level.ssinfos.begin();it!=next_level.ssinfos.end();it++)
+    for(auto it=next_level.ssinfos.begin();it!=next_level.ssinfos.end();)
     {
         if(it->min_key>del_max_key||it->max_key<del_min_key)
+        {
+            it++;
             continue;
-        SSTable sstable(it->filename);
-        tmp.merge(sstable.get_list());
+        }
+        SSTable sstable(next_level.pathname+"/"+it->filename);
+        std::list<std::pair<uint64_t,std::string>>tmp=sstable.get_list();
+        auto rit=re.begin();
+        for(auto tit=tmp.begin();tit!=tmp.end();tit++)
+        {
+            while(rit!=re.end()&&tit->first>rit->first)
+                rit++;
+            if(rit!=re.end()&&tit->first==rit->first)
+                continue;
+            re.insert(rit,*tit);
+        }
         utils::rmfile((next_level.pathname+"/"+it->filename).c_str());
-        next_level.ssinfos.erase(it);
+        next_level.ssinfos.erase(it++);
     }
-    next_level.put_list(tmp);
+    next_level.put_list(re);
+    sort();
 }
 void Level::push_down_all(Level &next_level)
 {
-    std::list<std::pair<uint64_t,std::string>>tmp;
+    std::list<std::pair<uint64_t,std::string>>re;
     uint64_t del_min_key=UINT64_MAX,del_max_key=0;
     for(const SSInfo &ssinfo:ssinfos)
     {
-        SSTable sstable(ssinfo.filename);
-        tmp.merge(sstable.get_list());
+        SSTable sstable(pathname+"/"+ssinfo.filename);
+        std::list<std::pair<uint64_t,std::string>>tmp=sstable.get_list();
+        auto rit=re.begin();
+        for(auto tit=tmp.begin();tit!=tmp.end();tit++)
+        {
+            while(rit!=re.end()&&tit->first>rit->first)
+                rit++;
+            if(rit!=re.end()&&tit->first==rit->first)
+                continue;
+            re.insert(rit,*tit);
+        }
         del_min_key=std::min(del_min_key,ssinfo.min_key);
         del_max_key=std::max(del_max_key,ssinfo.max_key);
         utils::rmfile((pathname+"/"+ssinfo.filename).c_str());
     }
     ssinfos.clear();
-    for(auto it=next_level.ssinfos.begin();it!=next_level.ssinfos.end();it++)
+    for(auto it=next_level.ssinfos.begin();it!=next_level.ssinfos.end();)
     {
         if(it->min_key>del_max_key||it->max_key<del_min_key)
+        {
+            it++;
             continue;
-        SSTable sstable(it->filename);
-        tmp.merge(sstable.get_list());
+        }
+        SSTable sstable(next_level.pathname+"/"+it->filename);
+        std::list<std::pair<uint64_t,std::string>>tmp=sstable.get_list();
+        auto rit=re.begin();
+        for(auto tit=tmp.begin();tit!=tmp.end();tit++)
+        {
+            while(rit!=re.end()&&tit->first>rit->first)
+                rit++;
+            if(rit!=re.end()&&tit->first==rit->first)
+                continue;
+            re.insert(rit,*tit);
+        }
         utils::rmfile((next_level.pathname+"/"+it->filename).c_str());
-        next_level.ssinfos.erase(it);
+        next_level.ssinfos.erase(it++);
     }
-    next_level.put_list(tmp);
+    next_level.put_list(re);
 }
 std::string Level::get(uint64_t key) const
 {
@@ -98,10 +165,11 @@ std::string Level::get(uint64_t key) const
     {
         if(key<ssinfo.min_key||key>ssinfo.max_key)
             continue;
-        BloomFilter bf(ssinfo.filename);
+        BloomFilter bf(pathname+"/"+ssinfo.filename);
+        //std::cout<<"load "<<(pathname+"/"+ssinfo.filename)<<std::endl;
         if(bf.find(key))
         {
-            SSTable sstable(ssinfo.filename);
+            SSTable sstable(pathname+"/"+ssinfo.filename);
             std::string s=sstable.get(key);
             if(s!="")
                 return s;
@@ -111,8 +179,13 @@ std::string Level::get(uint64_t key) const
 }
 void Level::reset()
 {
+    for(auto &ssinfo:ssinfos)
+        utils::rmfile((pathname+"/"+ssinfo.filename).c_str());
     ssinfos.clear();
-    utils::rmdir(pathname.c_str());
+}
+void Level::sort()
+{
+    ssinfos.sort();
 }
 void Level::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::string>> &list) const
 {
@@ -120,19 +193,35 @@ void Level::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::s
     {
         if(key2<ssinfo.min_key||key1>ssinfo.max_key)
             continue;
-        SSTable sstable(ssinfo.filename);
+        SSTable sstable(pathname+"/"+ssinfo.filename);
         sstable.scan(key1,key2,list);
     }
 }
-LevelManager::LevelManager(const std::string &pathname)
+LevelManager::LevelManager(const std::string &pathname):
+    pathname(pathname)
 {
-    utils::mkdir((pathname+"level0").c_str());
-    levels.push_back(Level(2,(pathname+"level0").c_str()));
+    std::vector<std::string>dirs;
+    utils::scanDir(pathname,dirs);
+    if(!dirs.size())
+    {
+        std::string level_pathname=pathname+"/level0";
+        if(!utils::dirExists(level_pathname))
+            utils::mkdir(level_pathname.c_str());
+        return ;
+    }
+    for(auto &dir:dirs)
+    {
+        std::cout<<dir<<std::endl;
+        std::string level_pathname=pathname+"/"+dir;
+        levels.push_back(Level(levels[levels.size()-1].get_cap()*2,level_pathname));
+    }
 }
 void LevelManager::add_level()
 {
-    utils::mkdir(("level"+std::to_string(levels.size())).c_str());
-    levels.push_back(Level(levels[levels.size()].get_cap()*2,"level"+std::to_string(levels.size())));
+    std::string level_pathname=pathname+"/level"+std::to_string(levels.size());
+    if(!utils::dirExists(level_pathname))
+        utils::mkdir(level_pathname.c_str());
+    levels.push_back(Level(levels[levels.size()-1].get_cap()*2,level_pathname));
 }
 void LevelManager::put_sstable(const SSTable &sstable)
 {
@@ -154,17 +243,24 @@ std::string LevelManager::get(uint64_t key) const
     {
         std::string s=level.get(key);
         if(s!="")
+        {
+            if(s==Level::DELETE_LABEL)
+                return "";
             return s;
+        }
     }
     return "";
 }
 void LevelManager::reset()
 {
     for(auto &level:levels)
+    {
         level.reset();
+        utils::rmdir(level.get_pathname().c_str());
+    }
     levels.clear();
-    utils::mkdir("level0");
-    levels.push_back(Level(2,"level0"));
+    utils::mkdir((pathname+"/level0").c_str());
+    levels.push_back(Level(2,pathname+"/level0"));
 }
 void LevelManager::scan(uint64_t key1,uint64_t key2,std::list<std::pair<uint64_t,std::string>> &list) const
 {

@@ -5,18 +5,19 @@
 class SSTable;
 struct SSInfo
 {
-    time_t time_stamp;
-    uint64_t min_key,max_key;
+    uint64_t time_stamp,min_key,max_key;
     std::string filename;
+    SSInfo(const std::string &fullname,const std::string &filename);
     SSInfo(const SSTable &sstable,const std::string &filename);
-    SSInfo(time_t time_stamp,uint64_t min_key,uint64_t max_key,const std::string &filename);
+    SSInfo(uint64_t time_stamp,uint64_t min_key,uint64_t max_key,const std::string &filename);
+    bool operator<(const SSInfo &ssinfo) const;
 };
 class SSTable
 {
 friend SSInfo;
 private:
-    time_t time_stamp;
-    uint64_t sz,min_key,max_key;
+    static uint64_t time_stamp_cnt;
+    uint64_t time_stamp,sz,min_key,max_key;
     BloomFilter bf;
     std::list<std::pair<uint64_t,std::string>>list;
 public:

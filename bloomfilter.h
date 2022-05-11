@@ -6,7 +6,6 @@
 class BloomFilter
 {
 private:
-    static int MAX_SZ;
     Bits *bits;
 public:
     BloomFilter();
@@ -14,8 +13,10 @@ public:
     BloomFilter(const BloomFilter &bf);
     BloomFilter(const std::string &filename);
     ~BloomFilter();
+    const static int MAX_SZ;
     const BloomFilter &operator=(const BloomFilter &bf);
     operator char*() const;
+    unsigned int to_raw(uint64_t **dest) const;
     void insert(uint64_t elem);
     bool find(uint64_t elem) const;
 };
