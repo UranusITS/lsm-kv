@@ -12,7 +12,7 @@ Level::Level(int cap,const std::string &pathname):
     {
         SSInfo ssinfo=SSInfo(pathname+"/"+file,file);
         ssinfos.push_back(ssinfo);
-        filename_cnt=std::max(filename_cnt,uint64_t(atoll(file.c_str()+5)+1));
+        filename_cnt=std::max(filename_cnt,uint64_t(atoll(file.c_str())+1));
     }
     sort();
 }
@@ -207,13 +207,17 @@ LevelManager::LevelManager(const std::string &pathname):
         std::string level_pathname=pathname+"/level0";
         if(!utils::dirExists(level_pathname))
             utils::mkdir(level_pathname.c_str());
+        levels.push_back(Level(2,level_pathname));
         return ;
     }
     for(auto &dir:dirs)
     {
-        std::cout<<dir<<std::endl;
+        //std::cout<<dir<<std::endl;
         std::string level_pathname=pathname+"/"+dir;
-        levels.push_back(Level(levels[levels.size()-1].get_cap()*2,level_pathname));
+        if(levels.size())
+            levels.push_back(Level(levels[levels.size()-1].get_cap()*2,level_pathname));
+        else
+            levels.push_back(Level(2,level_pathname));
     }
 }
 void LevelManager::add_level()

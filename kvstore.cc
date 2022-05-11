@@ -25,8 +25,8 @@ void KVStore::put(uint64_t key,const std::string &s)
 	{
 		level_manager->put_sstable(SSTable(memtable));
 		memtable->reset();
+		memtable->put(key,s);
 	}
-	memtable->put(key,s);
 }
 /**
  * Returns the (string) value of the given key.

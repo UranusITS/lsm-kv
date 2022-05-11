@@ -1,5 +1,6 @@
 #include"memtable.h"
 #include<ctime>
+#include<iostream>
 const uint64_t MemTable::INIT_SZ=10272;
 const uint64_t MemTable::MAX_SZ=2097152;
 MemTable::MemTable()
@@ -37,11 +38,12 @@ std::list<std::pair<uint64_t,std::string>> MemTable::get_list() const
 }
 bool MemTable::put(uint64_t key,const std::string &s)
 {
+    //std::cout<<sz<<' '<<s.length()<<' '<<MAX_SZ<<std::endl;
     if(sz+13+s.length()>MAX_SZ) return false;
     if(key<min_key) min_key=key;
     if(key>max_key) max_key=key;
     skip_list->put(key,s);
-    sz+=13+s.length();
+    sz+=(13+s.length());
     return true;
 }
 std::string MemTable::get(uint64_t key)
@@ -52,7 +54,7 @@ bool MemTable::del(uint64_t key)
 {
     std::string s=skip_list->get(key);
     if(s=="") return false;
-    sz-=13+s.length();
+    sz-=(13+s.length());
     return skip_list->del(key);
 }
 void MemTable::reset()
